@@ -36,8 +36,8 @@ class PantientController extends Controller
         if (!$this->validateCep($request->input('cep')))
             return response()->json('cep invalido por favor preencher cep valido!');
 
-        $address_id = $this->ConsultCep($request->input('cep'));
-        if (!$address_id)
+        $address = $this->ConsultCep($request->input('cep'));
+        if (!$address)
             return response()->json('api de consulta do cep fora do ar!');
 
         //validate photo
@@ -57,7 +57,7 @@ class PantientController extends Controller
             'birthday' => $request->input('birthday'),
             'cpf' => $request->input('cpf'),
             'cns' => $request->input('cns'),
-            'address_id' => $address_id,
+            'address_id' => $address['id'],
         ]);
 
         $pantient->save();
@@ -188,15 +188,16 @@ class PantientController extends Controller
      */
     function ConsultCep(Request $request): mixed
     {
-        $redis = Redis::get('redis-cep-' . $request->input('cep'));
+
+        $redis = Redis::get('redis:cep:' . $request->input('cep'));
 
         if (!$redis) {
             $count = Address::where('cep', $request->input('cep'))->count();
 
             if ($count > 0) {
                 $address = Address::where('cep', $request->input('cep'))->first();
-                Redis::set('redis-cep-' . $address->cep, $address);
-                return $address->id;
+                Redis::set('redis:cep:' . $address->cep,  json_encode($address->toArray()));
+                return $address->toArray();
             }
 
             $json = $this->getCep($request);
@@ -208,11 +209,11 @@ class PantientController extends Controller
                 'cep' => $json->cep,
             ]);
             $address->save();
-            Redis::set('redis-cep-' . $address->cep, $address);
-            return $address->id;
+            Redis::set('redis:cep:' . $address->cep, json_encode($address->toArray()));
+            return $address->toArray();
         }
-
-        return $redis->address->id;
+        $result = json_encode($redis);
+        return $result;
     }
 
 
@@ -223,7 +224,10 @@ class PantientController extends Controller
      */
     public function getCep(Request $request):mixed
     {
-        dd('entrou');
+        $request->validate([
+            'cep' => 'required',
+        ]);
+
         $result = $request->route('cep') ?? $request->input('cep');
         if (!$this->validateCep($result))
             return response()->json('informe um cep valido');
@@ -234,7 +238,6 @@ class PantientController extends Controller
         $response = $client->get("https://viacep.com.br/ws/" . $cep . "/json/");
         $result = $response->getBody();
         $json = json_decode($result);
-        dd($json);
         
         return $json;
     }

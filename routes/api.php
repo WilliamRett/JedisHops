@@ -15,9 +15,10 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
+
 Route::middleware('api')->group(function () {
     Route::resource('pantients', PantientController::class);
-    Route::get('/getCep/{cep}', [PantientController::class, 'getCep']);
+    Route::post('/ConsultCep', [PantientController::class, 'ConsultCep']);
 });
 
 
