@@ -29,7 +29,7 @@
         methods: {
             addProduct() {
                 this.axios
-                    .post('http://localhost:8000/api/products', this.product)
+                    .post('http://localhost:8000/api/patient', this.product)
                     .then(response => (
                         this.$router.push({ name: 'home' })
                     ))

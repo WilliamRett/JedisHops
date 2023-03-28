@@ -4,10 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Pantient extends Model
 {
     use HasFactory;
+
+    /**
+     * The table associated with the model.
+     *
+     * @var string
+     */
+    protected $table = 'pantients';
 
     /**
      * The attributes that are mass assignable.
@@ -15,14 +23,14 @@ class Pantient extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'photo', 
+        'photo',
         'name',
         'mon',
         'birthday',
         'cpf',
         'cns',
         'address_id'
-    ];   
+    ];
 
     /**
      * Get the Pantient associated with the Address
@@ -33,6 +41,4 @@ class Pantient extends Model
     {
         return $this->hasOne(Pantient::class, 'address_id', 'id');
     }
-
-
 }

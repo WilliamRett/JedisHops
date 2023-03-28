@@ -4,10 +4,18 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Address extends Model
 {
     use HasFactory;
+
+    /**
+     * The table associated with the model.
+     *
+     * @var string
+     */
+    protected $table = 'addresses';
 
     /**
      * The attributes that are mass assignable.
@@ -15,13 +23,13 @@ class Address extends Model
      * @var array<int, string>
      */
     protected $fillable = [
-        'address', 
+        'address',
+        'neighborhood',
         'city',
         'state',
-        'country',
         'cep',
-    ]; 
-    
+    ];
+
 
     /**
      * Get all of the comments for the Address
@@ -32,5 +40,4 @@ class Address extends Model
     {
         return $this->hasMany(Pantient::class, 'foreign_key', 'local_key');
     }
-    
 }
