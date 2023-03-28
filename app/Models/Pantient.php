@@ -24,6 +24,15 @@ class Pantient extends Model
         'address_id'
     ];   
 
+    /**
+     * Get the Pantient associated with the Address
+     *
+     * @return \Illuminate\Database\Eloquent\Relations\HasOne
+     */
+    public function Pantient(): HasOne
+    {
+        return $this->hasOne(Pantient::class, 'address_id', 'id');
+    }
 
 
 }

@@ -6,16 +6,16 @@
             <thead>
             <tr>
                 <th>ID</th>
-                <th>Name</th>
-                <th>Detail</th>
+                <th>Numeor</th>
+                <th>Nome da Mae</th>
                 <!-- <th>Actions</th> -->
             </tr>
             </thead>
             <tbody>
-            <tr v-for="product in products" :key="product.id">
-                <td>{{ product.id }}</td>
-                <td>{{ product.name }}</td>
-                <td>{{ product.detail }}</td>
+            <tr v-for="patient in patients" :key="patient.id">
+                <td>{{ patient.id }}</td>
+                <td>{{ patient.name }}</td>
+                <td>{{ patient.mon }}</td>
                 <td>
                     <div class="btn-group" role="group">
                         <router-link :to="{name: 'edit', params: { id: product.id }}" class="btn btn-success">Edit</router-link>
@@ -37,7 +37,7 @@
         },
         created() {
             this.axios
-                .get('http://localhost:8000/api/products/')
+                .get('http://localhost:8000/api/patient/')
                 .then(response => {
                     this.products = response.data;
                 });
@@ -45,7 +45,7 @@
         methods: {
             deleteProduct(id) { 
                 this.axios
-                    .delete(`http://localhost:8000/api/products/${id}`)
+                    .delete(`http://localhost:8000/api/patient/${id}`)
                     .then(response => {
                         let i = this.products.map(data => data.id).indexOf(id);
                         this.products.splice(i, 1)

@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StorePantientRequest;
+use App\Models\Pantient;
 use Illuminate\Http\Request;
 
 class PantientController extends Controller
@@ -12,7 +14,7 @@ class PantientController extends Controller
         return array_reverse($products);      
     }
 
-    public function store(Request $request)
+    public function store(StorePantientRequest $request)
     {
         $pantient = new Pantient([
             // 'photo'=> $request->input('name'),

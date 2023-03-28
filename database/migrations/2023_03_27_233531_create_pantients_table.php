@@ -8,8 +8,10 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
+     *
+     * @return void
      */
-    public function up(): void
+    public function up()
     {
         Schema::create('pantients', function (Blueprint $table) {
             $table->id();
@@ -20,19 +22,18 @@ return new class extends Migration
             $table->string('cpf','14');
             $table->string('cns','15');
             $table->unsignedBigInteger('address_id');
+            $table->foreign('address_id')->references('id')->on('address');
             $table->timestamps();
-        });
-
-        Schema::table('pantients', function (Blueprint $table) {
-            $table->foreignId('address_id')->constrained();
         });
     }
 
     /**
      * Reverse the migrations.
+     *
+     * @return void
      */
-    public function down(): void
+    public function down()
     {
-        Schema::dropIfExists('pantients');
+        Schema::dropIfExists('patients');
     }
 };
