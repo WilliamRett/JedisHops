@@ -104,17 +104,6 @@ class PantientController extends Controller
     }
 
     /**
-     * @param Mixed $photo
-     * 
-     * @return mixed
-     */
-    public function UploadFile(Request $request): mixed
-    {
-       
-        $data = Image::create($result);
-    }
-
-    /**
      * @param String $cep
      * 
      * @return [type]
