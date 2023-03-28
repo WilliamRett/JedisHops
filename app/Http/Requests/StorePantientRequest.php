@@ -13,7 +13,7 @@ class StorePantientRequest extends FormRequest
      */
     public function authorize()
     {
-        return false;
+        return true;
     }
 
     /**
@@ -24,12 +24,13 @@ class StorePantientRequest extends FormRequest
     public function rules()
     {
         return [
-            'name' => 'required',
-            'mon' => 'required',
+            'name' => 'required|string',
+            'mon' => 'required|string',
+            'photo'=>'required|image|mimes:jpg,png,jpeg,gif,svg|max:2048',
             'birthday' => 'required',
-            'cpf' => 'required',
-            'cns' => 'required',
-            'cep' => 'required',
+            'cpf' => 'required|string',
+            'cns' => 'required|string',
+            'cep' => 'required|string',
         ];
     }
 }
