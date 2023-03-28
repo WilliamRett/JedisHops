@@ -7,9 +7,12 @@ use App\Models\Address;
 use App\Models\Pantient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Http\UploadedFile;
 
 class PantientController extends Controller
 {
+
+
     /**
      * list all pantients
      * @return [type]
@@ -19,45 +22,43 @@ class PantientController extends Controller
         $products = Pantient::all()->toArray();
         return array_reverse($products);
     }
-    
+
     /**
      * create new register for pacients
-     * @param StorePantientRequest $request
+     * @param Request $request
      * 
      * @return mixed
      */
     public function store(StorePantientRequest $request): mixed
     {
+        $validatedData = $request->validated();
         //validate cns
-        if (!$this->validateCNS($request->input('cns')))
+        if (!$this->validateCns($validatedData['cns']))
             return response()->json('cns invalido por favor preencher cns valido!');
 
         //validate cep
-        if (!$this->validateCep($request->input('cep')))
+        if (!$this->validateCep($validatedData['cep']))
             return response()->json('cep invalido por favor preencher cep valido!');
 
-        $address = $this->ConsultCep($request->input('cep'));
+        //Consult cep
+        $address = $this->ConsultCep($request);
         if (!$address)
             return response()->json('api de consulta do cep fora do ar!');
 
         //validate photo
-        if (!$request->hasFile('photo') && !$request->file('photo')->isValid())
-            return response()->json('formato de foto nao suportado, favor enviar outro formato!');
+        $validatedData['photo'] = $request->file('photo')->store('image');
 
-        $url = $this->UploadFile($request->file('photo'));
-
-        if (!$url) {
-            return response()->json('Falha ao fazer upload');
-        }
+        //Convert date
+        $date = date('Y-m-d H:i:s',strtotime($validatedData['birthday']));
 
         $pantient = new Pantient([
-            'photo' => $url,
-            'name' => $request->input('name'),
-            'mon' => $request->input('mon'),
-            'birthday' => $request->input('birthday'),
-            'cpf' => $request->input('cpf'),
-            'cns' => $request->input('cns'),
-            'address_id' => $address['id'],
+            'photo' => $validatedData['photo'],
+            'name' => $validatedData['name'],
+            'mon' => $validatedData['mon'],
+            'birthday' => $date,
+            'cpf' => $validatedData['cpf'],
+            'cns' => $validatedData['cns'],
+            'address_id' => $address->id,
         ]);
 
         $pantient->save();
@@ -86,7 +87,7 @@ class PantientController extends Controller
     public function update($id, Request $request)
     {
         $pantient = Pantient::find($id);
-        $pantient->update($request->all());
+        $pantient->update($request->all()); 
         return response()->json('Pantient updated!');
     }
 
@@ -107,61 +108,10 @@ class PantientController extends Controller
      * 
      * @return mixed
      */
-    public function UploadFile(Mixed $photo): mixed
+    public function UploadFile(Request $request): mixed
     {
-        $name = uniqid(date('HisYmd'));
-        $extension = $photo->image->extension();
-        $nameFile = "{$name}.{$extension}";
-        $upload = $photo->image->storeAs('galery', $nameFile);
-        if (!$upload)
-            return false;
-        return $upload;
-    }
-
-    /**
-     * @param String $cns
-     * 
-     * @return [type]
-     */
-    function validateCNS(String $cns)
-    {
-        $cns = preg_replace('/[^0-9]/', '', $cns);
-
-        if (strlen($cns) != 15) {
-            return false;
-        }
-
-        $bigint = 0;
-
-        for ($i = 0; $i < 15; $i++) {
-            $bigint += intval(substr($cns, $i, 1)) * (15 - $i);
-        }
-
-        $dv1 = 11 - ($bigint % 11);
-
-        if ($dv1 == 11) {
-            $dv1 = 0;
-        }
-
-        $bigint = 0;
-
-        for ($i = 0; $i < 15; $i++) {
-            $bigint += intval(substr($cns, $i, 1)) * (15 - $i + 1);
-        }
-
-        $bigint += $dv1 * 2;
-
-        $dv2 = 11 - ($bigint % 11);
-
-        if ($dv2 == 11) {
-            $dv2 = 0;
-        }
-
-        return (intval(substr($cns, 0, 1)) == 1 || intval(substr($cns, 0, 1)) == 2)
-            && intval(substr($cns, 10, 3)) != 0
-            && intval(substr($cns, 11, 4)) != 0
-            && intval(substr($cns, 15, 1)) == $dv1
-            && intval(substr($cns, 16, 1)) == $dv2;
+       
+        $data = Image::create($result);
     }
 
     /**
@@ -188,15 +138,14 @@ class PantientController extends Controller
      */
     function ConsultCep(Request $request): mixed
     {
-
-        $redis = Redis::get('redis:cep:' . $request->input('cep'));
-
+        $cep = str_replace('-', '', $request['cep']);
+        $redis = Redis::get('redis:cep:' . $cep);
         if (!$redis) {
-            $count = Address::where('cep', $request->input('cep'))->count();
+            $count = Address::where('cep', $cep)->count();
 
             if ($count > 0) {
-                $address = Address::where('cep', $request->input('cep'))->first();
-                Redis::set('redis:cep:' . $address->cep,  json_encode($address->toArray()));
+                $address = Address::where('cep', $cep)->first();
+                Redis::set('redis:cep:' . $cep,  json_encode($address->toArray()));
                 return $address->toArray();
             }
 
@@ -206,13 +155,14 @@ class PantientController extends Controller
                 'neighborhood' =>  $json->bairro,
                 'city' => $json->localidade,
                 'state' => $json->uf,
-                'cep' => $json->cep,
+                'cep' => $cep,
             ]);
             $address->save();
-            Redis::set('redis:cep:' . $address->cep, json_encode($address->toArray()));
+
+            Redis::set('redis:cep:' . $cep, json_encode($address->toArray()));
             return $address->toArray();
         }
-        $result = json_encode($redis);
+        $result = json_decode($redis);
         return $result;
     }
 
@@ -222,7 +172,7 @@ class PantientController extends Controller
      * 
      * @return mixed
      */
-    public function getCep(Request $request):mixed
+    public function getCep(Request $request): mixed
     {
         $request->validate([
             'cep' => 'required',
@@ -238,7 +188,101 @@ class PantientController extends Controller
         $response = $client->get("https://viacep.com.br/ws/" . $cep . "/json/");
         $result = $response->getBody();
         $json = json_decode($result);
-        
+
         return $json;
+    }
+
+
+    /**
+     * @param mixed $cns
+     * 
+     * @return bool
+     */
+    function validateCns($cns): bool
+    {
+
+        if (strlen(trim($cns)) != 15) {
+            return false;
+        }
+        $initValue = substr($cns, 0, 1);
+
+        if ($initValue <= 2 && $initValue >= 1) {
+            return $this->cnsValidateForInitOneAndTwo($cns);
+        }
+
+        if ($initValue <= 9 && $initValue >= 7) {
+            return $this->ValidateCnsProv($cns);
+        }
+    }
+
+    /**
+     * @param string $cns
+     * 
+     * @return bool
+     */
+    function cnsValidateForInitOneAndTwo(string $cns): bool
+    {
+        $soma = 0;
+        $resto = 0;
+        $dv = 0;
+        $pis = "";
+        $resultado = "";
+        $pis = substr($cns, 0, 11);
+
+        for ($i = 0; $i < 11; $i++) {
+            $soma += (int) $pis[$i] * (15 - $i);
+        }
+
+        $resto = $soma % 11;
+        $dv = 11 - $resto;
+
+        if ($dv == 11) {
+            $dv = 0;
+        }
+
+        if ($dv == 10) {
+            $soma = 0;
+            for ($i = 0; $i < 11; $i++) {
+                $soma += (int) $pis[$i] * (15 - $i);
+            }
+            $soma += 2;
+            $resto = $soma % 11;
+            $dv = 11 - $resto;
+            $resultado = $pis . "001" . (string) $dv;
+        } else {
+            $resultado = $pis . "000" . (string) $dv;
+        }
+
+        if ($cns != $resultado) {
+            return false;
+        } else {
+            return true;
+        }
+    }
+
+    /**
+     * @param string $cns
+     * 
+     * @return bool
+     */
+    function ValidateCnsProv(string $cns): bool
+    {
+        if (strlen(trim($cns)) != 15) {
+            return false;
+        }
+
+        $soma = 0;
+
+        for ($i = 0; $i < 15; $i++) {
+            $soma += (int)$cns[$i] * (15 - $i);
+        }
+
+        $resto = $soma % 11;
+
+        if ($resto != 0) {
+            return false;
+        } else {
+            return true;
+        }
     }
 }
