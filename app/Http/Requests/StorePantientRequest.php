@@ -29,7 +29,7 @@ class StorePantientRequest extends FormRequest
             'birthday' => 'required',
             'cpf' => 'required',
             'cns' => 'required',
-            'address_id' => 'required',
+            'cep' => 'required',
         ];
     }
 }

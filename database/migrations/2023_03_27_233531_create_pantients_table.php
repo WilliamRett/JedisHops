@@ -22,7 +22,7 @@ return new class extends Migration
             $table->string('cpf','14');
             $table->string('cns','15');
             $table->unsignedBigInteger('address_id');
-            $table->foreign('address_id')->references('id')->on('address');
+            $table->foreign('address_id')->references('id')->on('addresses');
             $table->timestamps();
         });
     }
@@ -34,6 +34,6 @@ return new class extends Migration
      */
     public function down()
     {
-        Schema::dropIfExists('patients');
+        Schema::dropIfExists('pantients');
     }
 };
