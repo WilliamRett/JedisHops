@@ -5,17 +5,21 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StorePantientRequest;
 use App\Models\Address;
 use App\Models\Pantient;
+use Exception;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redis;
-use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpFoundation\Response;
 
 class PantientController extends Controller
 {
-
-
     /**
      * list all pantients
+     *
      * @return [type]
+     *
      */
     public function index()
     {
@@ -23,92 +27,167 @@ class PantientController extends Controller
         return array_reverse($products);
     }
 
+
     /**
      * create new register for pacients
-     * @param Request $request
-     * 
+     *
+     * @param StorePantientRequest $request
+     *
      * @return mixed
+     *
      */
-    public function store(StorePantientRequest $request): mixed
+    public function store(StorePantientRequest $request): JsonResponse
     {
-        $validatedData = $request->validated();
-        //validate cns
-        if (!$this->validateCns($validatedData['cns']))
-            return response()->json('cns invalido por favor preencher cns valido!');
-
-        //validate cep
-        if (!$this->validateCep($validatedData['cep']))
-            return response()->json('cep invalido por favor preencher cep valido!');
-
-        //Consult cep
-        $address = $this->ConsultCep($request);
-        if (!$address)
-            return response()->json('api de consulta do cep fora do ar!');
-
-        //validate photo
-        $validatedData['photo'] = $request->file('photo')->store('image');
-
-        //Convert date
-        $date = date('Y-m-d H:i:s',strtotime($validatedData['birthday']));
-
-        $pantient = new Pantient([
-            'photo' => $validatedData['photo'],
-            'name' => $validatedData['name'],
-            'mon' => $validatedData['mon'],
-            'birthday' => $date,
-            'cpf' => $validatedData['cpf'],
-            'cns' => $validatedData['cns'],
-            'address_id' => $address->id,
-        ]);
-
-        $pantient->save();
-
-        return response()->json('Pantient created!');
+        try {
+            $pantient = new Pantient();
+            $validatedData = $request->validated();
+            $pantient = $this->registerValidate($validatedData, $pantient);
+            $pantient->save();
+        } catch (Exception $ex) {
+            report($ex);
+            return response()->json($ex->getMessage(), Response::HTTP_UNPROCESSABLE_ENTITY);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json($e->getMessage(), Response::HTTP_BAD_REQUEST);
+        }
+        return response()->json('Pantient created!', Response::HTTP_OK);
     }
 
-    /**
-     * 
-     * @param mixed $id
-     * 
-     * @return [type]
-     */
-    public function show($id)
-    {
-        $pantient = Pantient::find($id);
-        return response()->json($pantient);
-    }
 
     /**
-     * @param mixed $id
-     * @param Request $request
-     * 
-     * @return [type]
+     * retrieve a patient record
+     *
+     * @param int $id
+     *
+     * @return JsonResponse
+     *
      */
-    public function update($id, Request $request)
+    public function show(int $id): JsonResponse
     {
         $pantient = Pantient::find($id);
-        $pantient->update($request->all()); 
-        return response()->json('Pantient updated!');
+        return response()->json($pantient, Response::HTTP_OK);
     }
 
+
+
     /**
-     * @param mixed $id
-     * 
-     * @return [type]
+     * [Description for update]
+     *
+     * @param int $id
+     * @param request $request
+     *
+     * @return JsonResponse
+     *
      */
-    public function destroy($id)
+    public function update(int $id, request $request): JsonResponse
     {
-        $pantient = Pantient::find($id);
-        $pantient->delete();
+        $pantient = Pantient::with(['address'])->where('id',$id)->get();
+        dd($pantient);
+        $validatedData = $request->all();
+
+        try {
+            $pantient = $this->registerValidate($validatedData, $pantient);
+            $pantient->update();
+        } catch (Exception $ex) {
+            report($ex);
+            return response()->json($ex->getMessage(), Response::HTTP_UNPROCESSABLE_ENTITY);
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json($e->getMessage(), Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+        return response()->json('Pantient updated!', Response::HTTP_OK);
+    }
+
+
+    /**
+     * [Description for destroy]
+     *
+     * @param int $id
+     *
+     * @return JsonResponse
+     *
+     */
+    public function destroy(int $id): JsonResponse
+    {
+        try {
+            $pantient = Pantient::find($id);
+            $pantient->delete();
+        } catch (\Throwable $e) {
+            report($e);
+            return response()->json($e->getMessage(), Response::HTTP_UNPROCESSABLE_ENTITY);
+        }
+
+
         return response()->json('Pantient deleted!');
     }
 
+
     /**
-     * @param String $cep
-     * 
-     * @return [type]
+     * [Description for registerValidate]
+     *
+     * @param Array $request
+     * @param Pantient|null $pantient
+     *
+     * @return mixed
+     *
      */
-    function validateCep(String $cep)
+    public function registerValidate(array $request, Pantient $pantient = null): mixed
+    {
+        $model = $pantient ?? new Pantient();
+
+        $name     = $request['name']  ?? $model->name;
+        $photo    = $model->photo     ?? $request['photo'];
+        $mon      = $request['mon']   ?? $model->mon;
+        $cpf      = $request['cpf']   ?? $model->cpf;
+        $cns      = $request['cns']   ?? $model->cns;
+        $cep      = $request['cep']   ?? $model->with('address:id');
+        $birthday = date('Y-m-d H:i:s', strtotime($request['birthday'])) ?? $model->birthday;
+
+
+
+        if (!empty($request)) {
+            //validate cns
+            if (!$this->validateCns($request['cns']))
+            throw ValidationException::withMessages(['msg' => 'cns invalido por favor preencher cns valido!', 'status' => Response::HTTP_UNPROCESSABLE_ENTITY]);
+
+            //validate cep
+            if (!$this->validateCep($request['cep']))
+            throw ValidationException::withMessages(['msg' => 'cep invalido por favor preencher cep valido!', 'status' => Response::HTTP_UNPROCESSABLE_ENTITY]);
+
+            //Consult cep
+            $address = $this->ConsultCep($request['cep']);
+            if (!$address)
+            throw ValidationException::withMessages(['msg' => 'api de consulta do cep fora do ar!', 'status' => Response::HTTP_UNPROCESSABLE_ENTITY]);
+
+            //validate photo
+            if (isset($request['photo'])) {
+                $request['photo'] = Storage::disk('img')->put($request['photo'], 'Contents');
+            }
+        }
+
+        $model->name = $name;
+        $model->photo = $photo;
+        $model->mon = $mon;
+        $model->cpf = $cpf;
+        $model->cns = $cns;
+        $model->birthday = $birthday;
+        $model->address_id = $address->id;
+
+        return $model;
+    }
+
+
+
+
+    /**
+     * zip code valid
+     *
+     * @param String $cep
+     *
+     * @return bool
+     *
+     */
+    function validateCep(String $cep): bool
     {
         // Remove caracteres não numéricos do CEP
         $cep = preg_replace('/[^0-9]/', '', $cep);
@@ -120,25 +199,28 @@ class PantientController extends Controller
         return true;
     }
 
+
     /**
-     * @param Request $request
-     * 
+     * [Description for ConsultCep]
+     *
+     * @param string $request
+     *
      * @return mixed
+     *
      */
-    function ConsultCep(Request $request): mixed
+    function ConsultCep(string $cep): mixed
     {
-        $cep = str_replace('-', '', $request['cep']);
+        $cep = str_replace('-', '', $cep);
         $redis = Redis::get('redis:cep:' . $cep);
         if (!$redis) {
             $count = Address::where('cep', $cep)->count();
-
             if ($count > 0) {
                 $address = Address::where('cep', $cep)->first();
                 Redis::set('redis:cep:' . $cep,  json_encode($address->toArray()));
                 return $address->toArray();
             }
 
-            $json = $this->getCep($request);
+            $json = $this->getCep($cep);
             $address = new Address([
                 'address' => $json->logradouro,
                 'neighborhood' =>  $json->bairro,
@@ -156,43 +238,40 @@ class PantientController extends Controller
     }
 
 
+
     /**
+     * [Description for getCep]
+     *
      * @param Request $request
-     * 
+     *
      * @return mixed
+     *
      */
-    public function getCep(Request $request): mixed
+    public function getCep(String $cep): mixed
     {
-        $request->validate([
-            'cep' => 'required',
-        ]);
-
-        $result = $request->route('cep') ?? $request->input('cep');
-        if (!$this->validateCep($result))
-            return response()->json('informe um cep valido');
-
-        $cep = str_replace('-', '', $result);
-
         $client = new \GuzzleHttp\Client();
         $response = $client->get("https://viacep.com.br/ws/" . $cep . "/json/");
         $result = $response->getBody();
         $json = json_decode($result);
-
         return $json;
     }
 
 
-    /**
-     * @param mixed $cns
-     * 
-     * @return bool
-     */
-    function validateCns($cns): bool
-    {
 
+    /**
+     * [Description for validateCns]
+     *
+     * @param string $cns
+     *
+     * @return bool
+     *
+     */
+    function validateCns(string $cns): bool
+    {
         if (strlen(trim($cns)) != 15) {
             return false;
         }
+
         $initValue = substr($cns, 0, 1);
 
         if ($initValue <= 2 && $initValue >= 1) {
@@ -204,10 +283,14 @@ class PantientController extends Controller
         }
     }
 
+
     /**
+     * [Description for cnsValidateForInitOneAndTwo]
+     *
      * @param string $cns
-     * 
+     *
      * @return bool
+     *
      */
     function cnsValidateForInitOneAndTwo(string $cns): bool
     {
@@ -249,10 +332,14 @@ class PantientController extends Controller
         }
     }
 
+
     /**
+     * [Description for ValidateCnsProv]
+     *
      * @param string $cns
-     * 
+     *
      * @return bool
+     *
      */
     function ValidateCnsProv(string $cns): bool
     {

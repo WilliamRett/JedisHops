@@ -37,8 +37,8 @@ class Pantient extends Model
      *
      * @return \Illuminate\Database\Eloquent\Relations\HasOne
      */
-    public function Pantient(): HasOne
+    public function address(): HasOne
     {
-        return $this->hasOne(Pantient::class, 'address_id', 'id');
+        return $this->hasOne(Address::class, 'id', 'address_id');
     }
 }

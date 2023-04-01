@@ -23,6 +23,7 @@ class Address extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'id',
         'address',
         'neighborhood',
         'city',
@@ -38,6 +39,6 @@ class Address extends Model
      */
     public function Pantients(): HasMany
     {
-        return $this->hasMany(Pantient::class, 'foreign_key', 'local_key');
+        return $this->hasMany(Pantient::class, 'address_id', 'local_key');
     }
 }

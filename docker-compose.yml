@@ -1,0 +1,69 @@
+version: "3.1"
+
+services:
+  potgres:
+    image: postgres
+    restart: always
+    container_name: database
+    environment:
+      POSTGRES_USER: ${DB_USERNAME}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_DATABASE}
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    mem_limit: 512m
+    networks:
+        - lan-docker
+
+  redis:
+    image: redis
+    container_name: cache
+    restart: always
+    volumes:
+      - ./redis-data:/data
+    ports:
+      - "6379:6379"
+    mem_limit: 512m
+    networks:
+        - lan-docker
+
+  webserver:
+    image: nginx:alpine
+    container_name: webserver
+    working_dir: /application
+    volumes:
+        - ./application:/application
+        - ./sourcefiles/nginx:/etc/nginx/conf.d
+    ports:
+     - "80:80"
+    networks:
+        - lan-docker
+
+  php-fpm:
+    build: .
+    container_name: php-fpm
+    volumes:
+      - ./application:/application
+      - ./sourcefiles/php-fpm/php-ini-overrides.ini:/etc/php/7.3/fpm/conf.d/99-overrides.ini
+    networks:
+        - lan-docker
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.15.0
+    restart: always
+    container_name: elastic
+    environment:
+      - discovery.type=single-node
+    volumes:
+      - ./elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+          - lan-docker
+
+networks:
+  lan-docker:
+    driver: bridge
